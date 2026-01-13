@@ -97,12 +97,10 @@ jobs:
           ECOHERO_KEY_PASSWORD: ${{ secrets.ECOHERO_KEY_PASSWORD }}
         run: |
           # Create key.properties without echoing sensitive values
-          cat > android/key.properties << EOF
-          storePassword=$ECOHERO_KEYSTORE_PASSWORD
-          keyPassword=$ECOHERO_KEY_PASSWORD
-          keyAlias=$ECOHERO_KEY_ALIAS
-          storeFile=keystore/release.jks
-          EOF
+          echo "storePassword=$ECOHERO_KEYSTORE_PASSWORD" > android/key.properties
+          echo "keyPassword=$ECOHERO_KEY_PASSWORD" >> android/key.properties
+          echo "keyAlias=$ECOHERO_KEY_ALIAS" >> android/key.properties
+          echo "storeFile=keystore/release.jks" >> android/key.properties
           
           echo "✅ key.properties created successfully"
 

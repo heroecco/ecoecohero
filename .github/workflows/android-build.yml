@@ -96,13 +96,49 @@ jobs:
           ECOHERO_KEY_ALIAS: ${{ secrets.ECOHERO_KEY_ALIAS }}
           ECOHERO_KEY_PASSWORD: ${{ secrets.ECOHERO_KEY_PASSWORD }}
         run: |
+          # Verify secrets are not empty
+          if [ -z "$ECOHERO_KEYSTORE_PASSWORD" ]; then
+            echo "❌ ECOHERO_KEYSTORE_PASSWORD secret is empty or not set!"
+            exit 1
+          fi
+          if [ -z "$ECOHERO_KEY_ALIAS" ]; then
+            echo "❌ ECOHERO_KEY_ALIAS secret is empty or not set!"
+            exit 1
+          fi
+          if [ -z "$ECOHERO_KEY_PASSWORD" ]; then
+            echo "❌ ECOHERO_KEY_PASSWORD secret is empty or not set!"
+            exit 1
+          fi
+          echo "✅ All secrets are set"
+          
           # Create key.properties without echoing sensitive values
           echo "storePassword=$ECOHERO_KEYSTORE_PASSWORD" > android/key.properties
           echo "keyPassword=$ECOHERO_KEY_PASSWORD" >> android/key.properties
           echo "keyAlias=$ECOHERO_KEY_ALIAS" >> android/key.properties
           echo "storeFile=keystore/release.jks" >> android/key.properties
           
-          echo "✅ key.properties created successfully"
+          # Verify file was created with content
+          if [ -s "android/key.properties" ]; then
+            echo "✅ key.properties created with $(wc -l < android/key.properties) lines"
+          else
+            echo "❌ key.properties is empty!"
+            exit 1
+          fi
+
+      - name: Verify keystore is valid
+        env:
+          ECOHERO_KEYSTORE_PASSWORD: ${{ secrets.ECOHERO_KEYSTORE_PASSWORD }}
+          ECOHERO_KEY_ALIAS: ${{ secrets.ECOHERO_KEY_ALIAS }}
+        run: |
+          # Verify keystore using keytool
+          if keytool -list -keystore android/app/keystore/release.jks -storepass "$ECOHERO_KEYSTORE_PASSWORD" -alias "$ECOHERO_KEY_ALIAS" > /dev/null 2>&1; then
+            echo "✅ Keystore is valid and contains the key alias"
+          else
+            echo "❌ Keystore verification failed! Check password and alias."
+            echo "Attempting to list keystore contents..."
+            keytool -list -keystore android/app/keystore/release.jks -storepass "$ECOHERO_KEYSTORE_PASSWORD" 2>&1 || true
+            exit 1
+          fi
 
       # =====================================================================
       # BUILD FLUTTER APP

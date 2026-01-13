@@ -9,6 +9,12 @@
 #   - ECOHERO_KEY_ALIAS: Key alias name
 #   - ECOHERO_KEY_PASSWORD: Key password
 #
+# SECURITY:
+#   - Keystore is decoded from base64 at runtime
+#   - Secrets are NEVER printed to logs
+#   - All sensitive files are deleted after build
+#   - Release builds ONLY - no debug fallback
+#
 # =============================================================================
 
 name: Android Build
@@ -31,6 +37,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FLUTTER_VERSION: '3.27.3'
+  JAVA_VERSION: '17'
+
 jobs:
   build:
     name: Build Android APK & AAB
@@ -44,17 +54,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
 
-      - name: Set up Flutter
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.5'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           cache: true
 
@@ -64,6 +74,49 @@ jobs:
           flutter doctor -v
 
       # =====================================================================
+      # VALIDATE SECRETS (FAIL FAST)
+      # =====================================================================
+      
+      - name: Validate required secrets
+        env:
+          HAS_KEYSTORE: ${{ secrets.ECOHERO_KEYSTORE_BASE64 != '' }}
+          HAS_STORE_PASS: ${{ secrets.ECOHERO_KEYSTORE_PASSWORD != '' }}
+          HAS_KEY_ALIAS: ${{ secrets.ECOHERO_KEY_ALIAS != '' }}
+          HAS_KEY_PASS: ${{ secrets.ECOHERO_KEY_PASSWORD != '' }}
+        run: |
+          echo "🔐 Validating GitHub Secrets..."
+          MISSING=""
+          
+          if [ "$HAS_KEYSTORE" != "true" ]; then
+            MISSING="$MISSING ECOHERO_KEYSTORE_BASE64"
+          fi
+          if [ "$HAS_STORE_PASS" != "true" ]; then
+            MISSING="$MISSING ECOHERO_KEYSTORE_PASSWORD"
+          fi
+          if [ "$HAS_KEY_ALIAS" != "true" ]; then
+            MISSING="$MISSING ECOHERO_KEY_ALIAS"
+          fi
+          if [ "$HAS_KEY_PASS" != "true" ]; then
+            MISSING="$MISSING ECOHERO_KEY_PASSWORD"
+          fi
+          
+          if [ -n "$MISSING" ]; then
+            echo "❌ Missing required secrets:$MISSING"
+            echo ""
+            echo "Please add the following secrets to your repository:"
+            echo "Settings → Secrets and variables → Actions → New repository secret"
+            echo ""
+            echo "Required secrets:"
+            echo "  - ECOHERO_KEYSTORE_BASE64"
+            echo "  - ECOHERO_KEYSTORE_PASSWORD"
+            echo "  - ECOHERO_KEY_ALIAS"
+            echo "  - ECOHERO_KEY_PASSWORD"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are configured"
+
+      # =====================================================================
       # DECODE KEYSTORE FROM SECRETS (SECURE)
       # =====================================================================
       
@@ -71,20 +124,30 @@ jobs:
         env:
           ECOHERO_KEYSTORE_BASE64: ${{ secrets.ECOHERO_KEYSTORE_BASE64 }}
         run: |
+          echo "🔓 Decoding keystore from base64..."
+          
           # Create keystore directory
           mkdir -p android/app/keystore
           
-          # Decode base64 keystore to file (no echo to prevent log exposure)
-          echo "$ECOHERO_KEYSTORE_BASE64" | base64 --decode > android/app/keystore/release.jks
+          # Decode base64 keystore to file
+          # Remove any whitespace/newlines that might have been introduced
+          echo "$ECOHERO_KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > android/app/keystore/release.jks
           
-          # Verify keystore was created (without exposing content)
-          if [ -f "android/app/keystore/release.jks" ]; then
-            echo "✅ Keystore decoded successfully"
-            echo "📦 File size: $(stat -c%s android/app/keystore/release.jks) bytes"
-          else
-            echo "❌ Failed to decode keystore"
+          # Verify keystore was created and has content
+          if [ ! -f "android/app/keystore/release.jks" ]; then
+            echo "❌ Failed to create keystore file"
             exit 1
           fi
+          
+          KEYSTORE_SIZE=$(stat -f%z android/app/keystore/release.jks 2>/dev/null || stat -c%s android/app/keystore/release.jks 2>/dev/null || echo "0")
+          
+          if [ "$KEYSTORE_SIZE" -lt 100 ]; then
+            echo "❌ Keystore file is too small (${KEYSTORE_SIZE} bytes) - likely corrupted"
+            echo "Please regenerate your keystore and update ECOHERO_KEYSTORE_BASE64 secret"
+            exit 1
+          fi
+          
+          echo "✅ Keystore decoded successfully (${KEYSTORE_SIZE} bytes)"
 
       # =====================================================================
       # CREATE KEY.PROPERTIES (SECURE)
@@ -96,49 +159,69 @@ jobs:
           ECOHERO_KEY_ALIAS: ${{ secrets.ECOHERO_KEY_ALIAS }}
           ECOHERO_KEY_PASSWORD: ${{ secrets.ECOHERO_KEY_PASSWORD }}
         run: |
-          # Verify secrets are not empty
-          if [ -z "$ECOHERO_KEYSTORE_PASSWORD" ]; then
-            echo "❌ ECOHERO_KEYSTORE_PASSWORD secret is empty or not set!"
-            exit 1
-          fi
-          if [ -z "$ECOHERO_KEY_ALIAS" ]; then
-            echo "❌ ECOHERO_KEY_ALIAS secret is empty or not set!"
-            exit 1
-          fi
-          if [ -z "$ECOHERO_KEY_PASSWORD" ]; then
-            echo "❌ ECOHERO_KEY_PASSWORD secret is empty or not set!"
-            exit 1
-          fi
-          echo "✅ All secrets are set"
+          echo "📝 Creating key.properties..."
           
-          # Create key.properties without echoing sensitive values
-          echo "storePassword=$ECOHERO_KEYSTORE_PASSWORD" > android/key.properties
-          echo "keyPassword=$ECOHERO_KEY_PASSWORD" >> android/key.properties
-          echo "keyAlias=$ECOHERO_KEY_ALIAS" >> android/key.properties
-          echo "storeFile=keystore/release.jks" >> android/key.properties
+          # Create key.properties in android directory
+          # The storeFile path is relative to android/app/ where build.gradle.kts is located
+          cat > android/key.properties << EOF
+          storePassword=$ECOHERO_KEYSTORE_PASSWORD
+          keyPassword=$ECOHERO_KEY_PASSWORD
+          keyAlias=$ECOHERO_KEY_ALIAS
+          storeFile=keystore/release.jks
+          EOF
           
-          # Verify file was created with content
-          if [ -s "android/key.properties" ]; then
-            echo "✅ key.properties created with $(wc -l < android/key.properties) lines"
-          else
-            echo "❌ key.properties is empty!"
+          # Remove leading whitespace from heredoc
+          sed -i 's/^[[:space:]]*//' android/key.properties
+          
+          # Verify file was created
+          if [ ! -s "android/key.properties" ]; then
+            echo "❌ Failed to create key.properties"
             exit 1
           fi
+          
+          echo "✅ key.properties created successfully"
+          echo "📄 Properties configured: $(wc -l < android/key.properties) entries"
 
-      - name: Verify keystore is valid
+      # =====================================================================
+      # VERIFY KEYSTORE IS VALID
+      # =====================================================================
+      
+      - name: Verify keystore integrity
         env:
           ECOHERO_KEYSTORE_PASSWORD: ${{ secrets.ECOHERO_KEYSTORE_PASSWORD }}
           ECOHERO_KEY_ALIAS: ${{ secrets.ECOHERO_KEY_ALIAS }}
         run: |
-          # Verify keystore using keytool
-          if keytool -list -keystore android/app/keystore/release.jks -storepass "$ECOHERO_KEYSTORE_PASSWORD" -alias "$ECOHERO_KEY_ALIAS" > /dev/null 2>&1; then
-            echo "✅ Keystore is valid and contains the key alias"
-          else
-            echo "❌ Keystore verification failed! Check password and alias."
-            echo "Attempting to list keystore contents..."
-            keytool -list -keystore android/app/keystore/release.jks -storepass "$ECOHERO_KEYSTORE_PASSWORD" 2>&1 || true
+          echo "🔍 Verifying keystore integrity..."
+          
+          # Test that keystore can be read with the provided password
+          if ! keytool -list -keystore android/app/keystore/release.jks \
+                       -storepass "$ECOHERO_KEYSTORE_PASSWORD" \
+                       -alias "$ECOHERO_KEY_ALIAS" > /dev/null 2>&1; then
+            echo "❌ Keystore verification failed!"
+            echo ""
+            echo "Possible causes:"
+            echo "  1. ECOHERO_KEYSTORE_PASSWORD is incorrect"
+            echo "  2. ECOHERO_KEY_ALIAS does not exist in the keystore"
+            echo "  3. ECOHERO_KEYSTORE_BASE64 is corrupted or incomplete"
+            echo ""
+            echo "Please verify your GitHub Secrets match your keystore"
+            
+            # Try to list available aliases (without exposing details)
+            echo ""
+            echo "Attempting to list keystore (checking if password is correct)..."
+            if keytool -list -keystore android/app/keystore/release.jks \
+                       -storepass "$ECOHERO_KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+              echo "Password is correct, but alias '$ECOHERO_KEY_ALIAS' was not found"
+              echo "Available aliases in keystore:"
+              keytool -list -keystore android/app/keystore/release.jks \
+                      -storepass "$ECOHERO_KEYSTORE_PASSWORD" 2>/dev/null | grep "Entry type:" -A0 -B1 || true
+            else
+              echo "Password verification failed - check ECOHERO_KEYSTORE_PASSWORD"
+            fi
             exit 1
           fi
+          
+          echo "✅ Keystore is valid and contains the specified key alias"
 
       # =====================================================================
       # BUILD FLUTTER APP
@@ -149,45 +232,79 @@ jobs:
 
       - name: Build signed APK (Release)
         run: |
+          echo "🔨 Building signed APK..."
           flutter build apk --release --no-tree-shake-icons
+          
+          if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+            echo "❌ APK build failed - file not found"
+            exit 1
+          fi
+          
           echo "✅ APK build completed"
 
       - name: Build signed AAB (Release)
         run: |
+          echo "🔨 Building signed AAB..."
           flutter build appbundle --release --no-tree-shake-icons
+          
+          if [ ! -f "build/app/outputs/bundle/release/app-release.aab" ]; then
+            echo "❌ AAB build failed - file not found"
+            exit 1
+          fi
+          
           echo "✅ AAB build completed"
 
       # =====================================================================
-      # VERIFY BUILDS ARE SIGNED (NOT DEBUG)
+      # VERIFY BUILDS ARE PROPERLY SIGNED (NOT DEBUG)
       # =====================================================================
       
-      - name: Verify APK signature
+      - name: Verify APK is release-signed
         run: |
+          echo "🔍 Verifying APK signature..."
+          
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
-          if [ -f "$APK_PATH" ]; then
-            # Check if APK is signed
-            if unzip -l "$APK_PATH" | grep -q "META-INF/.*\.SF"; then
-              echo "✅ APK is properly signed"
-            else
-              echo "❌ APK is not signed!"
-              exit 1
-            fi
-            echo "📦 APK size: $(stat -c%s "$APK_PATH" | numfmt --to=iec) bytes"
-          else
+          
+          # Check if APK exists
+          if [ ! -f "$APK_PATH" ]; then
             echo "❌ APK not found at $APK_PATH"
             exit 1
           fi
+          
+          # Verify APK is signed (has META-INF signature files)
+          if ! unzip -l "$APK_PATH" | grep -q "META-INF/.*\.SF"; then
+            echo "❌ APK is NOT signed - this should not happen!"
+            exit 1
+          fi
+          
+          # Verify it's not debug-signed by checking the signature
+          # Debug keystore has a known SHA-1 fingerprint pattern
+          APK_SIGNER_OUTPUT=$(apksigner verify --print-certs "$APK_PATH" 2>/dev/null || jarsigner -verify -verbose -certs "$APK_PATH" 2>/dev/null | head -20 || true)
+          
+          # Check for debug signature indicators
+          if echo "$APK_SIGNER_OUTPUT" | grep -qi "CN=Android Debug"; then
+            echo "❌ APK is signed with DEBUG certificate!"
+            echo "This is a security issue - release builds must use release keystore"
+            exit 1
+          fi
+          
+          APK_SIZE=$(stat -f%z "$APK_PATH" 2>/dev/null || stat -c%s "$APK_PATH")
+          echo "✅ APK is properly release-signed"
+          echo "📦 APK size: $(numfmt --to=iec $APK_SIZE 2>/dev/null || echo "$APK_SIZE bytes")"
 
-      - name: Verify AAB exists
+      - name: Verify AAB exists and is valid
         run: |
+          echo "🔍 Verifying AAB..."
+          
           AAB_PATH="build/app/outputs/bundle/release/app-release.aab"
-          if [ -f "$AAB_PATH" ]; then
-            echo "✅ AAB build successful"
-            echo "📦 AAB size: $(stat -c%s "$AAB_PATH" | numfmt --to=iec) bytes"
-          else
+          
+          if [ ! -f "$AAB_PATH" ]; then
             echo "❌ AAB not found at $AAB_PATH"
             exit 1
           fi
+          
+          AAB_SIZE=$(stat -f%z "$AAB_PATH" 2>/dev/null || stat -c%s "$AAB_PATH")
+          echo "✅ AAB build successful"
+          echo "📦 AAB size: $(numfmt --to=iec $AAB_SIZE 2>/dev/null || echo "$AAB_SIZE bytes")"
 
       # =====================================================================
       # CLEANUP SENSITIVE FILES
@@ -196,20 +313,22 @@ jobs:
       - name: Cleanup keystore and credentials
         if: always()
         run: |
+          echo "🧹 Cleaning up sensitive files..."
+          
           # Securely delete keystore
           if [ -f "android/app/keystore/release.jks" ]; then
             shred -u android/app/keystore/release.jks 2>/dev/null || rm -f android/app/keystore/release.jks
-            echo "🗑️ Keystore deleted"
+            echo "  ✓ Keystore deleted"
           fi
           
           # Securely delete key.properties
           if [ -f "android/key.properties" ]; then
             shred -u android/key.properties 2>/dev/null || rm -f android/key.properties
-            echo "🗑️ key.properties deleted"
+            echo "  ✓ key.properties deleted"
           fi
           
           # Remove keystore directory
-          rm -rf android/app/keystore
+          rm -rf android/app/keystore 2>/dev/null || true
           
           echo "✅ Cleanup completed"
 
@@ -246,6 +365,12 @@ jobs:
           echo "| APK (Release) | ✅ Built & Signed |" >> $GITHUB_STEP_SUMMARY
           echo "| AAB (Release) | ✅ Built & Signed |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📥 Download artifacts from the Actions tab" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download" >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts from the **Artifacts** section below." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔒 **Security**: Keystore and credentials were securely deleted after build" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔒 Security" >> $GITHUB_STEP_SUMMARY
+          echo "- Keystore decoded from GitHub Secrets only" >> $GITHUB_STEP_SUMMARY
+          echo "- No secrets exposed in logs" >> $GITHUB_STEP_SUMMARY
+          echo "- All sensitive files securely deleted after build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

@@ -68,14 +68,16 @@ android {
     
     buildTypes {
         release {
-            // Use release signing if key.properties exists, otherwise fail
-            // This ensures we NEVER fall back to debug signing for release builds
+            // CRITICAL: Use release signing config ONLY if key.properties exists
+            // For CI builds: key.properties is created from GitHub Secrets
+            // For local builds without keystore: this will be null, causing build to fail
+            // We NEVER fall back to debug signing for release builds
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
-                // For local development without keystore, use debug
-                // GitHub Actions will always have key.properties
-                signingConfigs.getByName("debug")
+                // Return null - this will cause the release build to fail
+                // which is the desired behavior (no debug fallback)
+                null
             }
             
             // Enable code shrinking and obfuscation

@@ -170,29 +170,66 @@ export JAVA_HOME=$(/usr/libexec/java_home)
 export PATH=$JAVA_HOME/bin:$PATH
 ```
 
+### "Missing required secrets" error
+
+The workflow validates that all secrets are configured before building. If you see this:
+
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Ensure all 4 secrets are added:
+   - `ECOHERO_KEYSTORE_BASE64`
+   - `ECOHERO_KEYSTORE_PASSWORD`
+   - `ECOHERO_KEY_ALIAS`
+   - `ECOHERO_KEY_PASSWORD`
+
 ### "Keystore was tampered with" error
 
 The keystore password is incorrect. Double-check the `ECOHERO_KEYSTORE_PASSWORD` secret.
 
+### "Keystore file is too small" error
+
+The base64-encoded keystore is corrupted or incomplete:
+
+1. Regenerate the keystore using `generate-keystore.ps1` or `generate-keystore.sh`
+2. Copy the **entire** contents of `keystore-base64.txt` (no truncation)
+3. Update the `ECOHERO_KEYSTORE_BASE64` secret with the new value
+
 ### "R8: Missing class com.google.android.play.core..." error
 
-The proguard-rules.pro should already include `-dontwarn` rules for Play Core classes. If you still see this:
+The `proguard-rules.pro` should already include `-dontwarn` rules for Play Core classes. If you still see this:
 
 1. Verify `android/app/proguard-rules.pro` exists
-2. Verify `build.gradle.kts` references it in the release build type
+2. Add the missing class to the proguard rules:
+   ```
+   -dontwarn com.google.android.play.core.missing.ClassName
+   ```
 
 ### Build fails with "No key with alias found"
 
 The key alias is incorrect. Double-check:
 1. The `ECOHERO_KEY_ALIAS` secret matches what you entered during keystore creation
 2. Key aliases are case-sensitive
+3. The workflow will show available aliases if the password is correct
 
-### APK is not signed
+### APK is signed with DEBUG certificate
 
-Check the workflow logs for any errors during:
-1. Keystore decoding
-2. key.properties creation
-3. Flutter build
+This should not happen with the current configuration. The workflow:
+1. Explicitly checks for debug signatures and fails if found
+2. The build.gradle.kts does NOT fall back to debug signing
+
+If you see this error, check that `key.properties` is being created correctly.
+
+### Local release build fails
+
+For local release builds, you need to create `android/key.properties` manually:
+
+```properties
+storePassword=your_keystore_password
+keyPassword=your_key_password
+keyAlias=your_key_alias
+storeFile=path/to/your/keystore.jks
+```
+
+**Note:** The `storeFile` path is relative to `android/app/`.
 
 ---
 

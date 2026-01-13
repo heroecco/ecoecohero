@@ -30,27 +30,34 @@
 #
 # -----------------------------------------------------------------------------
 
-# Play Core - Split Install
--dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
--dontwarn com.google.android.play.core.splitinstall.SplitInstallException
--dontwarn com.google.android.play.core.splitinstall.SplitInstallManager
--dontwarn com.google.android.play.core.splitinstall.SplitInstallManagerFactory
--dontwarn com.google.android.play.core.splitinstall.SplitInstallRequest$Builder
--dontwarn com.google.android.play.core.splitinstall.SplitInstallRequest
--dontwarn com.google.android.play.core.splitinstall.SplitInstallSessionState
--dontwarn com.google.android.play.core.splitinstall.SplitInstallStateUpdatedListener
+# Play Core - All packages (comprehensive coverage)
+-dontwarn com.google.android.play.core.**
+
+# Play Core - Split Install (explicit for clarity)
+-dontwarn com.google.android.play.core.splitcompat.**
+-dontwarn com.google.android.play.core.splitinstall.**
 
 # Play Core - Tasks
--dontwarn com.google.android.play.core.tasks.OnFailureListener
--dontwarn com.google.android.play.core.tasks.OnSuccessListener
--dontwarn com.google.android.play.core.tasks.Task
+-dontwarn com.google.android.play.core.tasks.**
 
 # Play Core - Common
--dontwarn com.google.android.play.core.common.PlayCoreDialogWrapperActivity
--dontwarn com.google.android.play.core.listener.StateUpdatedListener
+-dontwarn com.google.android.play.core.common.**
+-dontwarn com.google.android.play.core.listener.**
+
+# Play Core - Review
 -dontwarn com.google.android.play.core.review.**
+
+# Play Core - App Update
 -dontwarn com.google.android.play.core.appupdate.**
+
+# Play Core - Asset Packs
 -dontwarn com.google.android.play.core.assetpacks.**
+
+# Play Core - Install State
+-dontwarn com.google.android.play.core.install.**
+
+# Play Core - Integrity
+-dontwarn com.google.android.play.core.integrity.**
 
 # -----------------------------------------------------------------------------
 # GENERAL ANDROID RULES

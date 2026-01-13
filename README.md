@@ -4,7 +4,7 @@ A new Flutter project.
 
 ## Getting Started herte
 
-This project is a starting point for a Flutter application.
+This project is a starting point for a Flutter applicationss.
 
 A few resources to get you started if this is your first Flutter project:
 

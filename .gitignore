@@ -1,0 +1,227 @@
+# =============================================================================
+# ECO HERO - GITIGNORE
+# Excludes all unnecessary files, build artifacts, and personal information
+# =============================================================================
+
+# =============================================================================
+# PERSONAL INFORMATION / SYSTEM-SPECIFIC FILES (CRITICAL)
+# =============================================================================
+
+# Android local properties (contains SDK paths with username)
+android/local.properties
+**/local.properties
+
+# Flutter plugin cache files (contains local paths with username)
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE workspace settings that may contain system-specific paths
+.idea/
+.idea/workspace.xml
+.idea/libraries/
+*.iml
+*.ipr
+*.iws
+
+# VS Code settings (may contain local paths)
+.vscode/
+*.code-workspace
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux system files
+*~
+.directory
+
+# =============================================================================
+# FLUTTER / DART BUILD & CACHE
+# =============================================================================
+
+# Dart tool
+.dart_tool/
+
+# Pub cache
+.pub-cache/
+.pub/
+
+# Build output
+/build/
+**/build/
+/coverage/
+
+# Generated documentation
+**/doc/api/
+
+# Flutter-specific
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.metadata
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# =============================================================================
+# ANDROID SPECIFIC
+# =============================================================================
+
+# Android build artifacts
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+/android/.gradle/
+/android/captures/
+/android/gradlew
+/android/gradlew.bat
+/android/gradle/wrapper/gradle-wrapper.jar
+/android/.cxx/
+
+# Generated files
+**/GeneratedPluginRegistrant.java
+**/GeneratedPluginRegistrant.kt
+
+# Signing keys (NEVER commit these)
+*.keystore
+*.jks
+key.properties
+**/key.properties
+android/app/keystore/
+**/keystore/release.jks
+keystore-base64.txt
+ecohero-release.jks
+
+# Local configuration
+**/local.properties
+
+# =============================================================================
+# iOS SPECIFIC
+# =============================================================================
+
+# iOS build artifacts
+**/DerivedData/
+**/Pods/
+**/.symlinks/
+**/Flutter/App.framework/
+**/Flutter/Flutter.framework/
+**/Flutter/Flutter.podspec
+**/Flutter/Generated.xcconfig
+**/Flutter/ephemeral/
+**/Flutter/app.flx
+**/Flutter/app.zip
+**/Flutter/flutter_assets/
+**/Flutter/flutter_export_environment.sh
+**/ios/Flutter/.last_build_id
+
+# Xcode user-specific data
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+xcuserdata/
+**/*sync/
+.sconsign.dblite
+.tags*
+
+# CocoaPods
+**/Podfile.lock
+
+# documentation
+documentation/
+
+# Generated files
+**/Runner/GeneratedPluginRegistrant.*
+ServiceDefinitions.json
+
+# Exceptions
+!default.mode1v3
+!default.mode2v3
+!default.pbxuser
+!default.perspectivev3
+
+# =============================================================================
+# WEB SPECIFIC
+# =============================================================================
+
+# Web build output is in /build/web (already covered by /build/)
+
+# =============================================================================
+# MISCELLANEOUS
+# =============================================================================
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Python bytecode (if any build scripts)
+*.pyc
+__pycache__/
+
+# Class files
+*.class
+
+# Swap files
+.swp
+
+# Editor directories
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# Vagrant
+**/.vagrant/
+
+# =============================================================================
+# SECURITY - NEVER COMMIT SECRETS
+# =============================================================================
+
+# Environment files
+.env
+.env.*
+*.env
+!.env.example
+
+# API keys and secrets
+secrets.json
+credentials.json
+google-services.json
+GoogleService-Info.plist
+
+# Firebase (if used)
+firebase_options.dart
+
+# =============================================================================
+# OPTIONAL - UNCOMMENT IF NEEDED
+# =============================================================================
+
+# Uncomment to ignore pubspec.lock (for packages, not apps)
+# pubspec.lock
+
+# Uncomment to ignore test coverage
+# coverage/
+# .test_coverage/
+

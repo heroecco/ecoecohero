@@ -20,96 +20,119 @@ class LevelCompleteMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Calculate next level (wrap to 1 if past last level)
-    final int nextLevel = game.currentLevelIndex < levels.length 
-        ? game.currentLevelIndex + 1 
+    final int nextLevel = game.currentLevelIndex < levels.length
+        ? game.currentLevelIndex + 1
         : 1;
-    
-    return Center(
-      child: EcoPanel(
-        width: 450,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'LEVEL COMPLETE!',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.comfortaa(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: AppColors.gold,
-                shadows: [
-                  const Shadow(
-                    color: AppColors.deepNavy,
-                    offset: Offset(2, 2),
-                    blurRadius: 0,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Stars Display
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(3, (index) {
-                // If index < starsEarned, show full star. Else empty/border.
-                // e.g. 2 stars = indices 0, 1 are full. index 2 is empty.
-                return Icon(
-                  index < game.starsEarned ? Icons.star : Icons.star_border,
-                  color: AppColors.gold,
-                  size: 48,
-                );
-              }),
-            ),
-            const SizedBox(height: 24),
 
-            Text(
-              'Score: ${game.score}',
-              style: GoogleFonts.comfortaa(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.deepNavy,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 400;
+
+    // Responsive sizing
+    final double maxPanelWidth = screenSize.width * 0.85;
+    final double panelWidth = maxPanelWidth.clamp(280.0, 380.0);
+    final double titleSize = isSmallScreen ? 22 : 26;
+    final double starSize = isSmallScreen ? 36 : 42;
+    final double scoreSize = isSmallScreen ? 18 : 20;
+    final double coinSize = isSmallScreen ? 18 : 20;
+    final double spacing = isSmallScreen ? 12 : 16;
+
+    return Center(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: spacing),
+          child: EcoPanel(
+            width: panelWidth,
+            padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.monetization_on, color: AppColors.gold, size: 28),
-                const SizedBox(width: 8),
                 Text(
-                  '+${game.coinsEarned}',
+                  'LEVEL COMPLETE!',
+                  textAlign: TextAlign.center,
                   style: GoogleFonts.comfortaa(
-                    fontSize: 24,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.gold,
+                    shadows: [
+                      const Shadow(
+                        color: AppColors.deepNavy,
+                        offset: Offset(2, 2),
+                        blurRadius: 0,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: spacing),
+
+                // Stars Display
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) {
+                    // If index < starsEarned, show full star. Else empty/border.
+                    // e.g. 2 stars = indices 0, 1 are full. index 2 is empty.
+                    return Icon(
+                      index < game.starsEarned ? Icons.star : Icons.star_border,
+                      color: AppColors.gold,
+                      size: starSize,
+                    );
+                  }),
+                ),
+                SizedBox(height: spacing),
+
+                Text(
+                  'Score: ${game.score}',
+                  style: GoogleFonts.comfortaa(
+                    fontSize: scoreSize,
                     fontWeight: FontWeight.bold,
                     color: AppColors.deepNavy,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.monetization_on,
+                      color: AppColors.gold,
+                      size: coinSize + 4,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '+${game.coinsEarned}',
+                      style: GoogleFonts.comfortaa(
+                        fontSize: coinSize,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.deepNavy,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: spacing * 1.5),
+                EcoButton(
+                  text: 'NEXT LEVEL',
+                  onPressed: () => _navigateToLevel(context, nextLevel),
+                  width: double.infinity,
+                ),
+                SizedBox(height: spacing * 0.75),
+                EcoButton(
+                  text: 'REPLAY',
+                  color: AppColors.cyan,
+                  onPressed: () =>
+                      _navigateToLevel(context, game.currentLevelIndex),
+                  width: double.infinity,
+                ),
+                SizedBox(height: spacing * 0.75),
+                EcoButton(
+                  text: 'HOME',
+                  color: AppColors.deepNavy,
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  width: double.infinity,
+                ),
               ],
             ),
-            const SizedBox(height: 32),
-            EcoButton(
-              text: 'NEXT LEVEL',
-              onPressed: () => _navigateToLevel(context, nextLevel),
-              width: double.infinity,
-            ),
-            const SizedBox(height: 16),
-            EcoButton(
-              text: 'REPLAY',
-              color: AppColors.cyan,
-              onPressed: () => _navigateToLevel(context, game.currentLevelIndex),
-              width: double.infinity,
-            ),
-            const SizedBox(height: 16),
-            EcoButton(
-              text: 'HOME',
-              color: AppColors.deepNavy,
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              width: double.infinity,
-            ),
-          ],
+          ),
         ),
       ),
     );
